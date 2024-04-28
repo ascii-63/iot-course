@@ -4,7 +4,7 @@
 #include <errno.h>
 
 // Function to send a command to the Modbus device
-void send_command(modbus_t *ctx, uint8_t *command, int command_length) {
+void request_data_command(modbus_t *ctx, uint8_t *command, int command_length) {
     int rc;
     uint8_t response_buffer[MODBUS_TCP_MAX_ADU_LENGTH];
 
@@ -37,35 +37,35 @@ void send_command(modbus_t *ctx, uint8_t *command, int command_length) {
         }
     }
 }
-// void send_command(modbus_t *ctx, uint8_t *command, int command_length) {
-//     int rc;
-//     uint8_t response_buffer[MODBUS_TCP_MAX_ADU_LENGTH];
+void send_command(modbus_t *ctx, uint8_t *command, int command_length) {
+    int rc;
+    uint8_t response_buffer[MODBUS_TCP_MAX_ADU_LENGTH];
 
-//     // Write the command to the device
-//     rc = modbus_send_raw_request(ctx, command, command_length);
-//     if (rc == -1) {
-//         fprintf(stderr, "Command failed: %s\n", modbus_strerror(errno));
-//     } else {
-//         printf("Command sent successfully\n");
+    // Write the command to the device
+    rc = modbus_send_raw_request(ctx, command, command_length);
+    if (rc == -1) {
+        fprintf(stderr, "Command failed: %s\n", modbus_strerror(errno));
+    } else {
+        printf("Command sent successfully\n");
 
-//         // Read the response from the device (optional)
-//         int response_length = modbus_receive_confirmation(ctx, response_buffer);
-//         if (response_length > 0) {
-//             printf("Response: ");
-//             for (int i = 0; i < response_length; ++i) {
-//                 printf("%02X ", response_buffer[i]);
-//             }
-//             printf("\n");
-//         } else if (response_length == -1) {
-//             fprintf(stderr, "Read feedback failed: %s\n", modbus_strerror(errno));
-//         } else {
-//             printf("No response received\n");
-//         }
-//     }
-// }
+        // Read the response from the device (optional)
+        int response_length = modbus_receive_confirmation(ctx, response_buffer);
+        if (response_length > 0) {
+            printf("Response: ");
+            for (int i = 0; i < response_length; ++i) {
+                printf("%02X ", response_buffer[i]);
+            }
+            printf("\n");
+        } else if (response_length == -1) {
+            fprintf(stderr, "Read feedback failed: %s\n", modbus_strerror(errno));
+        } else {
+            printf("No response received\n");
+        }
+    }
+}
 int main() {
     modbus_t *ctx;
-
+    int a;
     // Modbus device parameters
     const char *dev = "/dev/ttyUSB0"; // Modify this according to your device
     int baud = 9600;
@@ -91,14 +91,35 @@ int main() {
     }
 
     // Set slave ID (device address)
-    int slave_id = 2; // Change this according to your device
+    int slave_id = 2; 
     modbus_set_slave(ctx, slave_id);
+    //read device data 
     const int read_data[8] = {0x02, 0x03, 0x00, 0x48, 0x00, 0x05, 0x05, 0xDF};
-    // Example preset command (replace with your own command)
+    const int open_relay0[8] = {0x01,0x05,0x00,0x00,0xFF,0x00,0x8C,0x3A};
+    const int close_relay0[8] = {0x01, 0x05, 0x00 ,0x00, 0x00, 0x00, 0xCD, 0xCA};
+    // command to send 
+    printf("choose what to do ");
+    scanf("%d", &a);
     uint8_t preset_command[8] ;
-    for(int i = 0;i<=7;i++){
-        preset_command[i] = read_data[i];
-    }
+    switch (a)
+    {
+    case 1:
+        for(int i = 0;i<=7;i++){
+        preset_command[i] = read_data[i];}
+        break;
+    case 2:
+        for(int i = 0;i<=7;i++){
+        preset_command[i] = open_relay0[i];}
+        break;
+    case 3:
+            for(int i = 0;i<=7;i++){
+        preset_command[i] = close_relay0[i];}
+        break;
+    default:
+        printf("not an option");
+        break;
+    } 
+  
     int preset_command_length = sizeof(preset_command);
 
     // Call the function to send the preset command
