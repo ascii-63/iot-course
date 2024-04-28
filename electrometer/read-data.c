@@ -123,7 +123,7 @@ int main() {
     int preset_command_length = sizeof(preset_command);
 
     // Call the function to send the preset command
-    send_command(ctx, preset_command, preset_command_length);
+    request_data_command(ctx, preset_command, preset_command_length);
 
     // Close connection and free the context
     modbus_close(ctx);
