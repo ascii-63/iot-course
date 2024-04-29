@@ -22,14 +22,17 @@ void request_data_command(modbus_t *ctx, uint8_t *command, int command_length) {
             unsigned short current_raw = (response_buffer[5] << 8) | response_buffer[6];
             unsigned short power_raw = (response_buffer[7] << 8) | response_buffer[8];
             unsigned int energy_raw = (response_buffer[9] << 24) | (response_buffer[10] << 16) | (response_buffer[11] << 8) | response_buffer[12];
-            float voltage = voltage_raw / 100;
-            float current = current_raw /1000;
-            float power = power_raw / 10;
-            float energy = energy_raw / 100;
+            float voltage = (float)voltage_raw / 100;
+            float current = (float)current_raw /1000;
+            float power = (float)power_raw;
+            float energy = (float)energy_raw / 100;
             printf("Voltage: %.2f V\n", voltage);
-            printf("Current: %.6f A\n", current);
+            printf("Current: %.4f A\n", current);
             printf("Power: %.1f W\n", power);
             printf("Energy: %.1f Wh\n", energy);
+	    printf("Raw respond: ");
+            for (int i = 0; i < response_length; ++i) {
+                printf("%02X ", response_buffer[i]);}
         } else if (response_length == -1) {
             fprintf(stderr, "Read feedback failed: %s\n", modbus_strerror(errno));
         } else {
@@ -94,7 +97,7 @@ int main() {
     int slave_id = 2; 
     modbus_set_slave(ctx, slave_id);
     //read device data 
-    const int read_data[8] = {0x02, 0x03, 0x00, 0x48, 0x00, 0x05, 0x05, 0xDF};
+    const int read_data[8] = {0x02, 0x03, 0x01, 0x48, 0x00, 0x0A, 0x45, 0xE8};
     const int open_relay0[8] = {0x01,0x05,0x00,0x00,0xFF,0x00,0x8C,0x3A};
     const int close_relay0[8] = {0x01, 0x05, 0x00 ,0x00, 0x00, 0x00, 0xCD, 0xCA};
     // command to send 
