@@ -40,32 +40,7 @@ void request_data_command(modbus_t *ctx, uint8_t *command, int command_length) {
         }
     }
 }
-void send_command(modbus_t *ctx, uint8_t *command, int command_length) {
-    int rc;
-    uint8_t response_buffer[MODBUS_TCP_MAX_ADU_LENGTH];
 
-    // Write the command to the device
-    rc = modbus_send_raw_request(ctx, command, command_length);
-    if (rc == -1) {
-        fprintf(stderr, "Command failed: %s\n", modbus_strerror(errno));
-    } else {
-        printf("Command sent successfully\n");
-
-        // Read the response from the device (optional)
-        int response_length = modbus_receive_confirmation(ctx, response_buffer);
-        if (response_length > 0) {
-            printf("Response: ");
-            for (int i = 0; i < response_length; ++i) {
-                printf("%02X ", response_buffer[i]);
-            }
-            printf("\n");
-        } else if (response_length == -1) {
-            fprintf(stderr, "Read feedback failed: %s\n", modbus_strerror(errno));
-        } else {
-            printf("No response received\n");
-        }
-    }
-}
 int main() {
     modbus_t *ctx;
     int a;
