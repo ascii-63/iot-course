@@ -1,4 +1,4 @@
 dependencies/paho.mqtt.c/
 dependencies/paho.mqtt.cpp/
+build/
 **/*.out
-**/*
