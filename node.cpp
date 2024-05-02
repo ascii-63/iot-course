@@ -32,8 +32,10 @@ const char *DEV = "/dev/ttyUSB0";
 const int BAUDRATE = 9600;
 
 const uint8_t read_stats[REQUEST_BYTES_LENGTH] = {0x02, 0x03, 0x01, 0x48, 0x00, 0x0A, 0x45, 0xE8};
-const uint8_t open_relay0[REQUEST_BYTES_LENGTH] = {0x01, 0x05, 0x00, 0x00, 0xFF, 0x00, 0x8C, 0x3A};
-const uint8_t close_relay0[REQUEST_BYTES_LENGTH] = {0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0xCD, 0xCA};
+const uint8_t close_relay0[REQUEST_BYTES_LENGTH] = {0x01, 0x05, 0x00, 0x00, 0xFF, 0x00, 0x8C, 0x3A};
+const uint8_t open_relay0[REQUEST_BYTES_LENGTH] = {0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0xCD, 0xCA};
+
+modbus_t *ctx = nullptr;
 
 // A class to store Electrometer stats
 class Electrometer
@@ -55,28 +57,6 @@ public:
     ~Electrometer(){};
 };
 
-/////////////////////////////////////
-
-const std::string SERVER_ADDRESS = "tcp://armadillo.rmq.cloudamqp.com:1883";
-const std::string USERNAME = "pvevbtsi:pvevbtsi";
-const std::string PASSWORD = "Ed1HOeWlt1dHOO-pkuHNR3tZpWshwbX-";
-
-const std::string PERSIST_DIR = "./persist";
-const int QOS = 1;
-const auto TIMEOUT = std::chrono::seconds(10);
-
-// A callback class for use with the main MQTT client.
-class callback : public virtual mqtt::callback
-{
-public:
-    void connection_lost(const std::string &cause) override
-    {
-        std::cout << "\nConnection lost" << std::endl;
-        if (!cause.empty())
-            std::cout << "\tCause: " << cause << std::endl;
-    }
-};
-
 /*******************************************************************/
 
 // Send a request to device, get response in bytes
@@ -93,19 +73,22 @@ bool ALWAYS_INLINE sendRequest_getResponse(modbus_t *_ctx, const uint8_t *_bytes
     else
     {
         uint8_t response_buffer[MODBUS_TCP_MAX_ADU_LENGTH];
-        int response_length = modbus_receive_confirmation(_ctx, response_buffer);
-        if (response_length == 0)
+        int response_length = 0;
+        while (response_length == 0)
+        {
+            response_length = modbus_receive_confirmation(_ctx, response_buffer);
+        }
+
+        try
+        {
+            memcpy(_response, response_buffer, sizeof(response_buffer));
+        }
+        catch (const std::exception &exc)
+        {
+            std::cerr << exc.what() << std::endl;
             _response = nullptr;
-        else
-            try
-            {
-                memcpy(_response, response_buffer, sizeof(response_buffer));
-            }
-            catch (const std::exception &exc)
-            {
-                _response = nullptr;
-                return false;
-            }
+            return false;
+        }
         return true;
     }
 }
@@ -143,10 +126,13 @@ Electrometer ALWAYS_INLINE readStats(modbus_t *_ctx)
 }
 
 // Open Relay 0 from Modbus device
-bool ALWAYS_INLINE openReplay(modbus_t *_ctx)
+bool ALWAYS_INLINE openRelay(modbus_t *_ctx)
 {
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::cout << ">___________ Open" << std::endl;
     uint8_t dump_buffer[MODBUS_TCP_MAX_ADU_LENGTH];
     bool result = sendRequest_getResponse(_ctx, open_relay0, dump_buffer);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
     if (!result)
         return false;
     return true;
@@ -155,50 +141,177 @@ bool ALWAYS_INLINE openReplay(modbus_t *_ctx)
 // Close Relay 0 from Modbus device
 bool ALWAYS_INLINE closeRelay(modbus_t *_ctx)
 {
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::cout << ">___________ Close" << std::endl;
     uint8_t dump_buffer[MODBUS_TCP_MAX_ADU_LENGTH];
     bool result = sendRequest_getResponse(_ctx, close_relay0, dump_buffer);
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
     if (!result)
         return false;
     return true;
 }
 
+/////////////////////////////////////
+
+const std::string SERVER_ADDRESS = "tcp://armadillo.rmq.cloudamqp.com:1883";
+const std::string USERNAME = "pvevbtsi:pvevbtsi";
+const std::string PASSWORD = "Ed1HOeWlt1dHOO-pkuHNR3tZpWshwbX-";
+
+const std::string PERSIST_DIR = "./persist";
+const int QOS = 1;
+const auto TIMEOUT = std::chrono::seconds(10);
+
+class action_listener : public virtual mqtt::iaction_listener
+{
+    std::string name_;
+
+    void on_failure(const mqtt::token &tok) override
+    {
+        std::cout << name_ << " failure";
+        if (tok.get_message_id() != 0)
+            std::cout << " for token: [" << tok.get_message_id() << "]" << std::endl;
+        std::cout << std::endl;
+    }
+
+    void on_success(const mqtt::token &tok) override
+    {
+        std::cout << name_ << " success";
+        if (tok.get_message_id() != 0)
+            std::cout << " for token: [" << tok.get_message_id() << "]" << std::endl;
+        auto top = tok.get_topics();
+        if (top && !top->empty())
+            std::cout << "\ttoken topic: '" << (*top)[0] << "', ..." << std::endl;
+        std::cout << std::endl;
+    }
+
+public:
+    action_listener(const std::string &name) : name_(name) {}
+};
+
+// A callback class for use with the main MQTT client.
+class callback : public virtual mqtt::callback, public virtual mqtt::iaction_listener
+{
+    mqtt::async_client &cli_;
+    action_listener subListener_;
+    mqtt::connect_options &connOpts_;
+
+public:
+    void reconnect()
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2500));
+        try
+        {
+            cli_.connect(connOpts_, nullptr, *this);
+        }
+        catch (const mqtt::exception &exc)
+        {
+            std::cerr << "Error: " << exc.what() << std::endl;
+            exit(1);
+        }
+    }
+
+    void connection_lost(const std::string &cause) override
+    {
+        std::cout << "\nConnection lost" << std::endl;
+        if (!cause.empty())
+            std::cout << "\tCause: " << cause << std::endl;
+    }
+
+    void message_arrived(mqtt::const_message_ptr msg) override
+    {
+        std::cout << "Message arrived" << std::endl;
+        auto topic = msg->get_topic();
+        std::cout << ">___________ topic: " << topic << std::endl;
+        if (topic == "relay0")
+        {
+            std::cout << ">___________ payload: " << msg->get_payload() << std::endl;
+            if (msg->get_payload() == "1")
+            {
+
+                if (ctx == nullptr)
+                    return;
+                closeRelay(ctx);
+            }
+            if (msg->get_payload() == "0")
+            {
+
+                if (ctx == nullptr)
+                    return;
+                openRelay(ctx);
+            }
+        }
+    }
+
+    void connected(const std::string &cause) override
+    {
+
+        cli_.subscribe("relay0", QOS, nullptr, subListener_);
+    }
+
+    // Re-connection failure
+    void on_failure(const mqtt::token &tok) override
+    {
+        reconnect();
+    }
+
+    // (Re)connection success
+    // Either this or connected() can be used for callbacks.
+    void on_success(const mqtt::token &tok) override {}
+
+public:
+    callback(mqtt::async_client &cli, mqtt::connect_options &connOpts)
+        : cli_(cli), connOpts_(connOpts), subListener_("Subscription") {}
+};
+
 /*******************************************************************/
 
-// Create and connect to an MQTT Server, and then return the client
-mqtt::async_client_ptr createMQTTClient(const std::string _client_id)
+// // Create and connect to an MQTT Server, and then return the client
+// mqtt::async_client createMQTTClient(const std::string _client_id)
+// {
+//     std::cout << "Initializing for server '" << SERVER_ADDRESS << "'..." << std::endl;
+//     // mqtt::async_client_ptr  client = std::make_shared<mqtt::async_client>(SERVER_ADDRESS, _client_id, PERSIST_DIR);
+//     mqtt::async_client client(SERVER_ADDRESS, _client_id, PERSIST_DIR);
+
+//     auto connOpts = mqtt::connect_options_builder()
+//                         .clean_session()
+//                         .finalize();
+
+//     connOpts.set_user_name(USERNAME);
+//     connOpts.set_password(PASSWORD);
+
+//     callback cb(client, connOpts);
+//     client.set_callback(cb);
+
+//     try
+//     {
+//         std::cout << "Connecting..." << std::endl;
+//         mqtt::token_ptr conntok = client.connect(connOpts);
+//         std::cout << "Waiting for the connection..." << std::endl;
+//         conntok->wait();
+//         std::cout << "Connected to MQTT broker successfully." << std::endl;
+//     }
+//     catch (const mqtt::exception &exc)
+//     {
+//         std::cerr << "Error while connect to MQTT server: " << exc.what() << std::endl;
+
+//         return mqtt::async_client();
+//     }
+//     return client;
+// }
+
+std::string createMessage(const std::string _node_id, const Electrometer &_stats)
 {
-    std::cout << "Initializing for server '" << SERVER_ADDRESS << "'..." << std::endl;
-    mqtt::async_client_ptr client = std::make_shared<mqtt::async_client>(SERVER_ADDRESS, _client_id, PERSIST_DIR);
+    Json::Value json_stats;
+    json_stats["node_id"] = _node_id;
+    json_stats["voltage"] = _stats.voltage;
+    json_stats["current"] = _stats.current;
+    json_stats["power"] = _stats.power;
+    json_stats["energy"] = _stats.energy;
+    json_stats["status"] = _stats.status;
 
-    callback cb;
-    client->set_callback(cb);
-
-    auto connOpts = mqtt::connect_options_builder()
-                        .clean_session()
-                        .finalize();
-
-    connOpts.set_user_name(USERNAME);
-    connOpts.set_password(PASSWORD);
-
-    try
-    {
-        std::cout << "Connecting..." << std::endl;
-        mqtt::token_ptr conntok = client->connect(connOpts);
-        std::cout << "Waiting for the connection..." << std::endl;
-        conntok->wait();
-        std::cout << "Connected to MQTT broker successfully." << std::endl;
-    }
-    catch (const mqtt::exception &exc)
-    {
-        std::cerr << "Error while connect to MQTT server: " << exc.what() << std::endl;
-        return nullptr;
-    }
-    return client;
-}
-
-std::string createMessage(const Electrometer &_stats)
-{
-    return "";
+    std::string str_stats = json_stats.toStyledString();
+    return str_stats;
 }
 
 /*******************************************************************/
@@ -216,8 +329,6 @@ int main(int argc, char *argv[])
     const char *device = strdup(argv[2]);
 
     /////////////////////////////////////////
-
-    modbus_t *ctx;
 
     // Create a new RTU context
     ctx = modbus_new_rtu(device, BAUDRATE, PARITY, DATA_BIT, STOP_BIT);
@@ -243,22 +354,70 @@ int main(int argc, char *argv[])
 
     /////////////////////////////////////////
 
-    auto client = createMQTTClient(node_id);
-    if (!client)
+    // auto client = createMQTTClient(node_id);
+    // if (!client)
+    // {
+    //     std::cerr << "Failed to create MQTT client." << std::endl;
+    //     exit(EXIT_FAILURE);
+    // }
+    std::cout << "Initializing for server '" << SERVER_ADDRESS << "'..." << std::endl;
+    // mqtt::async_client_ptr  client = std::make_shared<mqtt::async_client>(SERVER_ADDRESS, _client_id, PERSIST_DIR);
+    mqtt::async_client client(SERVER_ADDRESS, node_id, PERSIST_DIR);
+
+    auto connOpts = mqtt::connect_options_builder()
+                        .clean_session()
+                        .finalize();
+
+    connOpts.set_user_name(USERNAME);
+    connOpts.set_password(PASSWORD);
+
+    callback cb(client, connOpts);
+    client.set_callback(cb);
+
+    try
     {
-        std::cerr << "Failed to create MQTT client." << std::endl;
-        exit(EXIT_FAILURE);
+        std::cout << "Connecting..." << std::endl;
+        mqtt::token_ptr conntok = client.connect(connOpts);
+        std::cout << "Waiting for the connection..." << std::endl;
+        conntok->wait();
+        std::cout << "Connected to MQTT broker successfully." << std::endl;
+    }
+    catch (const mqtt::exception &exc)
+    {
+        std::cerr << "Error while connect to MQTT server: " << exc.what() << std::endl;
     }
 
     /////////////////////////////////////////
 
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // openRelay(ctx);
+    // std::this_thread::sleep_for(std::chrono::seconds(2));
+    // closeRelay(ctx);
+    // std::this_thread::sleep_for(std::chrono::seconds(4));
+
     while (true)
     {
         auto current_stats = readStats(ctx);
-        if (current_stats.voltage == 0)
-            continue;
+        if (current_stats.voltage < 150)
+        {
+            // std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::cout << current_stats.voltage << std::endl;
+            // continue;
+        }
 
-        
+        std::cout << "Voltage: " << current_stats.voltage << std::endl
+                  << "Current: " << current_stats.current << std::endl
+                  << "Power: " << current_stats.power << std::endl
+                  << "Status: " << current_stats.status << std::endl
+                  << std::endl;
+
+        std::string message = createMessage(node_id, current_stats);
+        mqtt::message_ptr message_ptr = mqtt::make_message(topic, message);
+        mqtt::delivery_token_ptr token = client.publish(message_ptr);
+        if (token->is_complete())
+            std::cerr << "Failed to publish message." << std::endl;
+
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     /////////////////////////////////////////
