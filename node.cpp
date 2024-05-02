@@ -9,6 +9,10 @@
 
 #include "mqtt/async_client.h"
 #include "modbus/modbus.h"
+#include "json/json.h"
+
+#define ARGC_NEEDED 3
+#define ALWAYS_INLINE inline __attribute__((always_inline))
 
 /////////////////////////////////////
 
@@ -31,6 +35,7 @@ const uint8_t read_stats[REQUEST_BYTES_LENGTH] = {0x02, 0x03, 0x01, 0x48, 0x00, 
 const uint8_t open_relay0[REQUEST_BYTES_LENGTH] = {0x01, 0x05, 0x00, 0x00, 0xFF, 0x00, 0x8C, 0x3A};
 const uint8_t close_relay0[REQUEST_BYTES_LENGTH] = {0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0xCD, 0xCA};
 
+// A class to store Electrometer stats
 class Electrometer
 {
 public:
@@ -52,10 +57,30 @@ public:
 
 /////////////////////////////////////
 
+const std::string SERVER_ADDRESS = "tcp://armadillo.rmq.cloudamqp.com:1883";
+const std::string USERNAME = "pvevbtsi:pvevbtsi";
+const std::string PASSWORD = "Ed1HOeWlt1dHOO-pkuHNR3tZpWshwbX-";
+
+const std::string PERSIST_DIR = "./persist";
+const int QOS = 1;
+const auto TIMEOUT = std::chrono::seconds(10);
+
+// A callback class for use with the main MQTT client.
+class callback : public virtual mqtt::callback
+{
+public:
+    void connection_lost(const std::string &cause) override
+    {
+        std::cout << "\nConnection lost" << std::endl;
+        if (!cause.empty())
+            std::cout << "\tCause: " << cause << std::endl;
+    }
+};
+
 /*******************************************************************/
 
 // Send a request to device, get response in bytes
-bool sendRequest_getResponse(modbus_t *_ctx, const uint8_t *_bytes, uint8_t *_response)
+bool ALWAYS_INLINE sendRequest_getResponse(modbus_t *_ctx, const uint8_t *_bytes, uint8_t *_response)
 {
     // Send request to the device
     int req_res = modbus_send_raw_request(_ctx, _bytes, SIZEOF_REQUEST);
@@ -86,7 +111,7 @@ bool sendRequest_getResponse(modbus_t *_ctx, const uint8_t *_bytes, uint8_t *_re
 }
 
 // Read Stats from Modbus device
-Electrometer readStats(modbus_t *_ctx)
+Electrometer ALWAYS_INLINE readStats(modbus_t *_ctx)
 {
     uint8_t raw_stats[MODBUS_TCP_MAX_ADU_LENGTH];
     bool result = sendRequest_getResponse(_ctx, read_stats, raw_stats);
@@ -104,8 +129,11 @@ Electrometer readStats(modbus_t *_ctx)
         float current = (float)current_raw / 1000;
         float power = (float)power_raw;
         float energy = (float)energy_raw / 100;
+        bool status = true;
+        if (voltage == 0)
+            status = false;
 
-        
+        return Electrometer(voltage, current, power, energy, status);
     }
     catch (const std::exception &exc)
     {
@@ -114,16 +142,89 @@ Electrometer readStats(modbus_t *_ctx)
     }
 }
 
+// Open Relay 0 from Modbus device
+bool ALWAYS_INLINE openReplay(modbus_t *_ctx)
+{
+    uint8_t dump_buffer[MODBUS_TCP_MAX_ADU_LENGTH];
+    bool result = sendRequest_getResponse(_ctx, open_relay0, dump_buffer);
+    if (!result)
+        return false;
+    return true;
+}
+
+// Close Relay 0 from Modbus device
+bool ALWAYS_INLINE closeRelay(modbus_t *_ctx)
+{
+    uint8_t dump_buffer[MODBUS_TCP_MAX_ADU_LENGTH];
+    bool result = sendRequest_getResponse(_ctx, close_relay0, dump_buffer);
+    if (!result)
+        return false;
+    return true;
+}
+
+/*******************************************************************/
+
+// Create and connect to an MQTT Server, and then return the client
+mqtt::async_client_ptr createMQTTClient(const std::string _client_id)
+{
+    std::cout << "Initializing for server '" << SERVER_ADDRESS << "'..." << std::endl;
+    mqtt::async_client_ptr client = std::make_shared<mqtt::async_client>(SERVER_ADDRESS, _client_id, PERSIST_DIR);
+
+    callback cb;
+    client->set_callback(cb);
+
+    auto connOpts = mqtt::connect_options_builder()
+                        .clean_session()
+                        .finalize();
+
+    connOpts.set_user_name(USERNAME);
+    connOpts.set_password(PASSWORD);
+
+    try
+    {
+        std::cout << "Connecting..." << std::endl;
+        mqtt::token_ptr conntok = client->connect(connOpts);
+        std::cout << "Waiting for the connection..." << std::endl;
+        conntok->wait();
+        std::cout << "Connected to MQTT broker successfully." << std::endl;
+    }
+    catch (const mqtt::exception &exc)
+    {
+        std::cerr << "Error while connect to MQTT server: " << exc.what() << std::endl;
+        return nullptr;
+    }
+    return client;
+}
+
+std::string createMessage(const Electrometer &_stats)
+{
+    return "";
+}
+
+/*******************************************************************/
+
 int main(int argc, char *argv[])
 {
+    if (argc < ARGC_NEEDED)
+    {
+        std::cerr << "Usage: ./" << std::string(argv[0]) << " [node_id] [device]\n";
+        exit(EXIT_FAILURE);
+    }
+
+    const std::string node_id = std::string(argv[1]);
+    const std::string topic = node_id + "_stats";
+    const char *device = strdup(argv[2]);
+
+    /////////////////////////////////////////
+
     modbus_t *ctx;
 
     // Create a new RTU context
-    ctx = modbus_new_rtu(DEV, BAUDRATE, PARITY, DATA_BIT, STOP_BIT);
+    ctx = modbus_new_rtu(device, BAUDRATE, PARITY, DATA_BIT, STOP_BIT);
     if (ctx == nullptr)
     {
         std::cerr << "Unable to create the libmodbus context" << std::endl;
-        return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     // Set response timeout
@@ -134,13 +235,37 @@ int main(int argc, char *argv[])
     {
         std::cerr << "Connection failed: " << std::string(modbus_strerror(errno)) << std::endl;
         modbus_free(ctx);
-        // return EXIT_FAILURE;
+        exit(EXIT_FAILURE);
     }
 
     // Set slave ID (device address)
     modbus_set_slave(ctx, SLAVE_ID);
 
-    /////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////
+
+    auto client = createMQTTClient(node_id);
+    if (!client)
+    {
+        std::cerr << "Failed to create MQTT client." << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    /////////////////////////////////////////
+
+    while (true)
+    {
+        auto current_stats = readStats(ctx);
+        if (current_stats.voltage == 0)
+            continue;
+
+        
+    }
+
+    /////////////////////////////////////////
+
+    // Close connection and free the context
+    modbus_close(ctx);
+    modbus_free(ctx);
 
     return EXIT_SUCCESS;
 }

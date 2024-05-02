@@ -35,3 +35,12 @@ cmake -Bbuild -H. -DPAHO_BUILD_STATIC=ON \
 sudo cmake --build build/ --target install
 sudo ldconfig
 ```
+  3. JsonCPP:
+```
+git clone https://github.com/open-source-parsers/jsoncpp.git
+cd jsoncpp
+mkdir build && cd build
+cmake ..
+make
+sudo make install
+```
