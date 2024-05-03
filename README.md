@@ -12,6 +12,11 @@ sudo apt-get install build-essential gcc make cmake cmake-gui cmake-curses-gui \
 && sudo apt-get install libssl-dev \
 && sudo apt-get install doxygen graphviz
 ```
+  2. Pkg-Config:
+```
+sudo apt-get update 
+sudo apt-get install pkg-config
+```
 
 ## Dependencies:
   1. Paho MQTT C library:
@@ -43,4 +48,8 @@ mkdir build && cd build
 cmake ..
 make
 sudo make install
+```
+  4. Modbus Library
+```
+sudo apt-get install libmodbus-dev
 ```
