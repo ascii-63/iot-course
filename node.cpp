@@ -218,7 +218,7 @@ class callback : public virtual mqtt::callback,
 public:
     void connected(const std::string &cause) override
     {
-        cli_.subscribe("relay0", QOS, nullptr, subListener_);
+        cli_.subscribe(control_topic, QOS, nullptr, subListener_);
     }
 
     // This deomonstrates manually reconnecting to the broker by calling connect() again.
