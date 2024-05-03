@@ -2,3 +2,5 @@ dependencies/
 build/
 temp/
 **/*.out
+electrometer/.vscode/
+electrometer/read-data
