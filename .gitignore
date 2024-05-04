@@ -2,5 +2,4 @@ dependencies/
 build/
 temp/
 **/*.out
-electrometer/
-cloud/
+**/__pycache__/

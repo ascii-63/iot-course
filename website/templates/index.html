@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{url_for('static', filename='css/index.css')}}">
+    <title>Document</title>
+</head>
+
+<body>
+    <div class="container">
+        <table class="table" border="1">
+            <tr>
+                <th id="c1">Activate node</th>
+                <th id="c2">Deactivate node</th>
+                <th id="c3">Information</th>
+            </tr>
+            <tr class="content-table">
+                <td>
+                    <div class="column-1 margin">
+                        <p>node_1</p>
+                        <p>node_2</p>
+                        <p>node_3</p>
+                        <p>node_4</p>
+                    </div>
+                </td>
+                <td>
+                    <div class="column-2 margin">
+                        <p>node_5</p>
+                        <p>node_6</p>
+                        <p>node_7</p>
+                        <p>node_8</p>
+                    </div>
+                </td>
+                <td class="infor-column">
+                    <div class="power-wrapper">
+                        <p class="power-logo">P</p>
+                        <p class="power-value">0W</p>
+                    </div>
+
+                    <div class="u-wrapper">
+                        <p class="u-logo">U</p>
+                        <p class="u-value">0V</p>
+                    </div>
+
+                    <div class="i-wrapper">
+                        <p class="i-logo">I</p>
+                        <p class="i-value">0A</p>
+                    </div>
+
+                    <div class="number-wrapper">
+                        <p class="number-logo">Energy</p>
+                        <p class="number-value">0</p>
+                    </div>
+                    <div>
+                        <input type="checkbox" class="switch-btn" />
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <script type="module" src="/static/js/index.js"></script>
+</body>
+
+</html>
