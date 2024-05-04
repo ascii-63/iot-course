@@ -41,9 +41,15 @@ def getNodeList() -> list:
     list_node = []
 
     keys = redis_client.keys('*')
-    for key in keys:
-        value = str(redis_client.get(key))[2:-1]
-        new_value = messagePreprocessing(value)
+    for raw_key in keys:
+        raw_key = str(raw_key)
+        if ("node_" not in raw_key):
+            continue
+
+        key = raw_key[2:-1]
+        value = str(redis_client.get(key))
+        new_value = value[2:-1]
+        new_value = messagePreprocessing(new_value)
 
         list_node.append(new_value)
 

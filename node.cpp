@@ -132,7 +132,7 @@ Electrometer ALWAYS_INLINE readStats()
         float power = (float)power_raw;
         float energy = (float)energy_raw / 100;
         bool status = true;
-        if (voltage == 0)
+        if (current == 0)
             status = false;
 
         return Electrometer(voltage, current, power, energy, status);

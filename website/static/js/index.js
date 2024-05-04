@@ -38,9 +38,9 @@ function refreshContent() {
     });
 }
 
-
 //Call refreshContent initially
 refreshContent();
+setInterval(refreshContent, 1000);
 
 function FilterData(data) {
 

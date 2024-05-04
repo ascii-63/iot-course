@@ -33,6 +33,7 @@ def on_message(client: mqtt.Client, userdata, msg):
     replaced_message = replaced_message.replace("\\n", "").replace("\\t", "")
     result = json.loads(replaced_message)
 
+    print(replaced_message)
     r.set(result["node_id"], replaced_message)
 
 
