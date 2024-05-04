@@ -6,7 +6,6 @@
 body {
   font-size: 18px;
 }
-
 table {
   width: 100%;
   border-collapse: collapse;
@@ -19,14 +18,19 @@ table {
 th {
   font-size: 24px;
 }
-
-li {
-  list-style-type: none;
-  text-align: center;
+.margin{
+  height: 220px ;
+  overflow-y: auto;
+}
+p{
   margin-top: 10px;
   cursor: pointer;
+  text-align: center;
 }
-li:last-child {
+p:first-child{
+  margin-top: 0px;
+}
+p:last-child{
   margin-bottom: 10px;
 }
 
@@ -94,4 +98,12 @@ input[type="checkbox"]::before {
 }
 input:checked[type="checkbox"]::before {
   left: 50px;
+}
+.active{
+  background-color: rgba( 0, 255, 255, 1 );
+}
+.hover{
+  background-color: #c6c6c6;
+  width: 100%;
+  text-align: center;
 }

@@ -25,8 +25,8 @@
 #define REQUEST_BYTES_LENGTH 8 // Number bytes in a request
 #define SIZEOF_REQUEST 8       // Size of request in bytes
 
-#define PAYLOAD_CLOSE_RELAY "1" // Close relay payload on control topic
-#define PAYLOAD_OPEN_RELAY "0"  // Open relay payload on control topic
+#define PAYLOAD_CLOSE_RELAY_ADDON "/close" // Close relay payload addon in control topic message
+#define PAYLOAD_OPEN_RELAY_ADDON "/open"   // Open relay payload addon in control topic message
 
 /******************************** CONST ********************************/
 
@@ -44,12 +44,15 @@ const std::string PERSIST_DIR = "./persist";   // Persist directory
 const int QOS = 1;                             // Quality of Service
 const auto TIMEOUT = std::chrono::seconds(10); // Connection timeout
 
+const std::string stats_topic = "node_stats";     // Stats topic
+const std::string control_topic = "node_control"; // Control topic
+
 /******************************** GLOBAL VAR ********************************/
 
-modbus_t *ctx = nullptr;   // A modbus pointer
-std::string node_id;       // Node ID
-std::string stats_topic;   // Stats topic
-std::string control_topic; // Control topic
+modbus_t *ctx = nullptr;         // A modbus pointer
+std::string node_id;             // Node ID
+std::string close_relay_message; // Close relay message for this node
+std::string open_relay_message;  // Open relay message for this node
 
 /******************************** MODBUS ********************************/
 
@@ -264,13 +267,13 @@ public:
         auto topic = msg->get_topic(); // Message topic
         if (topic == control_topic)
         {
-            if (msg->get_payload() == PAYLOAD_CLOSE_RELAY)
+            if (msg->get_payload() == close_relay_message)
             {
                 if (ctx == nullptr)
                     return;
                 closeRelay();
             }
-            if (msg->get_payload() == PAYLOAD_OPEN_RELAY)
+            if (msg->get_payload() == open_relay_message)
             {
                 if (ctx == nullptr)
                     return;
@@ -312,8 +315,8 @@ int main(int argc, char *argv[])
     }
 
     node_id = std::string(argv[1]);
-    stats_topic = node_id + "_stats";
-    control_topic = node_id + "_control";
+    close_relay_message = node_id + std::string(PAYLOAD_CLOSE_RELAY_ADDON);
+    open_relay_message = node_id + std::string(PAYLOAD_OPEN_RELAY_ADDON);
     char *device = strdup(argv[2]); // Modbus device address
 
     /////////////////////////////////////////
