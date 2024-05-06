@@ -14,7 +14,7 @@ mqtt_client = mqtt.Client()
 mqtt_client.username_pw_set(MQTT_USR, MQTT_PWD)
 mqtt_client.connect(host=MQTT_HOST, port=MQTT_PORT, keepalive=MQTT_KEEP_ALIVE)
 
-NUM_PUBLISHER = 10000
+NUM_PUBLISHER = 100
 
 stats_dict = {"voltage": 220,
               "current": 1,
