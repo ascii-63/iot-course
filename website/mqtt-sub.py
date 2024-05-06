@@ -37,6 +37,19 @@ def on_message(client: mqtt.Client, userdata, msg):
     r.set(result["node_id"], replaced_message)
 
 
+def cleanRedisNodeDB():
+    keys = r.keys('*')
+    for raw_key in keys:
+        raw_key = str(raw_key)
+        if ("node_" not in raw_key):
+            continue
+        
+        key = raw_key[2:-1]
+        res = r.delete(key)
+        if res == 1:
+            print(f"Delete key: {key}")
+
+
 if __name__ == "__main__":
     mqtt_client.username_pw_set(MQTT_USR, MQTT_PWD)
     mqtt_client.on_connect = on_connect
@@ -44,6 +57,10 @@ if __name__ == "__main__":
 
     mqtt_client.connect(host=MQTT_HOST, port=MQTT_PORT,
                         keepalive=MQTT_KEEP_ALIVE)
+
+    # Clean node key in db
+    cleanRedisNodeDB()
+    print(f"\n#######################################\n")
 
     # Start the loop to process incoming messages
     mqtt_client.loop_forever()
