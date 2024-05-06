@@ -40,7 +40,7 @@ function refreshContent() {
 
 //Call refreshContent initially
 refreshContent();
-setInterval(refreshContent, 1000);
+// setInterval(refreshContent, 1000);
 
 function FilterData(data) {
 
@@ -80,8 +80,8 @@ function HandleBtn() {
             `http://127.0.0.1:5000/get-list-node/${activateArr[indexNow].node_id}/open`,
             newData
           );
-          deactivateArr.push(activateArr[indexNow]);
-          activateArr.splice(indexNow, 1);
+          // deactivateArr.push(activateArr[indexNow]);
+          // activateArr.splice(indexNow, 1);
         } else {
           deactivateArr[indexNow].status = true;
           var newData = { status: true };
@@ -89,8 +89,8 @@ function HandleBtn() {
             `http://127.0.0.1:5000/get-list-node/${deactivateArr[indexNow].node_id}/open`,
             newData
           );
-          activateArr.push(deactivateArr[indexNow]);
-          deactivateArr.splice(indexNow, 1);
+          // activateArr.push(deactivateArr[indexNow]);
+          // deactivateArr.splice(indexNow, 1);
         }
       } else {
         if (!deactivateArr[indexNow].Status && SwitchBtn.checked) {
@@ -100,8 +100,8 @@ function HandleBtn() {
             `http://127.0.0.1:5000/get-list-node/${deactivateArr[indexNow].node_id}/close`,
             newData
           );
-          activateArr.push(deactivateArr[indexNow]);
-          deactivateArr.splice(indexNow, 1);
+          // activateArr.push(deactivateArr[indexNow]);
+          // deactivateArr.splice(indexNow, 1);
         } else {
           activateArr[indexNow].status = false;
           var newData = { status: false };
@@ -109,8 +109,8 @@ function HandleBtn() {
             `http://127.0.0.1:5000/get-list-node/${activateArr[indexNow].node_id}/close`,
             newData
           );
-          deactivateArr.push(activateArr[indexNow]);
-          activateArr.splice(indexNow, 1);
+          // deactivateArr.push(activateArr[indexNow]);
+          // activateArr.splice(indexNow, 1);
         }
       }
 
@@ -125,6 +125,7 @@ function DisplayInformation() {
   var ActivateNodes = document.querySelectorAll(".activate");
   ActivateNodes.forEach((node, index) => {
     node.onclick = function () {
+      refreshContent();
       Pvalue.innerText = `${activateArr[index].power}W`;
       Uvalue.innerText = `${activateArr[index].voltage}V`;
       Ivalue.innerText = `${activateArr[index].current}A`;
@@ -137,6 +138,7 @@ function DisplayInformation() {
   var DeactivateNodes = document.querySelectorAll(".deactivate");
   DeactivateNodes.forEach((node, index) => {
     node.onclick = function () {
+      refreshContent();
       Pvalue.innerText = `${deactivateArr[index].power}W`;
       Uvalue.innerText = `${deactivateArr[index].voltage}V`;
       Ivalue.innerText = `${deactivateArr[index].current}A`;
