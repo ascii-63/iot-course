@@ -1,6 +1,7 @@
 import paho.mqtt.client as mqtt
 import json
 import time
+import random
 
 MQTT_HOST = 'armadillo.rmq.cloudamqp.com'  # MQTT server host
 MQTT_PORT = 1883  # MQTT server port
@@ -13,7 +14,7 @@ mqtt_client = mqtt.Client()
 mqtt_client.username_pw_set(MQTT_USR, MQTT_PWD)
 mqtt_client.connect(host=MQTT_HOST, port=MQTT_PORT, keepalive=MQTT_KEEP_ALIVE)
 
-NUM_PUBLISHER = 10
+NUM_PUBLISHER = 10000
 
 stats_dict = {"voltage": 220,
               "current": 1,
@@ -23,8 +24,9 @@ stats_dict = {"voltage": 220,
 
 while (True):
     for idx in range(NUM_PUBLISHER):
-        node_id = "node" + str(idx)
+        node_id = "node_" + str(idx)
         stats_dict["node_id"] = node_id
+        stats_dict["voltage"] = random.randint(210, 230)
         stats_msg = json.dumps(stats_dict)
 
         result = mqtt_client.publish(
