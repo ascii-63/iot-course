@@ -3,3 +3,5 @@ build/
 temp/
 **/*.out
 **/__pycache__/
+answer/
+template/
